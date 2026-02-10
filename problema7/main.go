@@ -6,31 +6,31 @@ import (
 	"time"
 )
 
-// Objetivo: Implementar un pool de workers que procesa trabajos y retorna resultados.
-// Usa un canal de trabajos y otro de resultados. Cierra canales correctamente.
-// TODO: completa las funciones y la orquestación en main().
-
+// Definimos el tipo de trabajo
 type trabajo struct {
 	ID int
 	X  int
 }
 
+// Definimos el tipo de resultado
 type resultado struct {
-	ID       int
-	X        int
+	ID        int
+	X         int
 	Procesado int
 }
 
+// Función worker
 func worker(id int, jobs <-chan trabajo, results chan<- resultado, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for j := range jobs {
-		// TODO: procesar j (simular trabajo con Sleep)
-		time.Sleep(200 * time.Millisecond)
+		// Simula procesamiento
+		time.Sleep(100 * time.Millisecond)
+
 		r := resultado{
 			ID:        j.ID,
 			X:         j.X,
-			Procesado: j.X * 2, // ejemplo: duplicar el valor
-
+			Procesado: j.X * 2, // ejemplo de procesamiento
+		}
 		fmt.Printf("[worker %d] procesa trabajo %d -> %d\n", id, j.ID, r.Procesado)
 		results <- r
 	}
@@ -38,42 +38,39 @@ func worker(id int, jobs <-chan trabajo, results chan<- resultado, wg *sync.Wait
 }
 
 func main() {
-	nTrabajos := 12
 	nWorkers := 3
+	nTrabajos := 5
 
-	jobs := make(chan trabajo)
-	results := make(chan resultado)
+	jobs := make(chan trabajo, nTrabajos)
+	results := make(chan resultado, nTrabajos)
 
 	var wg sync.WaitGroup
 
-	// TODO: lanzar nWorkers workers
+	// Lanzar workers
 	wg.Add(nWorkers)
 	for i := 1; i <= nWorkers; i++ {
-
+		go worker(i, jobs, results, &wg)
 	}
 
-	// TODO: productor de trabajos
+	// Productor de trabajos
 	go func() {
 		for i := 1; i <= nTrabajos; i++ {
-
+			j := trabajo{ID: i, X: i * 10}
+			fmt.Printf("[main] produce trabajo %d\n", j.ID)
+			jobs <- j
+			time.Sleep(50 * time.Millisecond) // simula tiempo entre producciones
 		}
 		close(jobs) // importante: cerrar para que los workers terminen
 	}()
 
-	// TODO: recolectar resultados en otra goroutine y cerrar results al final
-	var wgCollect sync.WaitGroup
-	wgCollect.Add(1)
+	// Goroutine para cerrar results cuando todos los workers terminen
 	go func() {
-		defer wgCollect.Done()
-		wg.Wait()      // esperar que todos los workers terminen
-		close(results) // entonces cerrar resultados
+		wg.Wait()
+		close(results)
 	}()
 
-	// Consumidor principal de resultados
+	// Consumidor de resultados
 	for r := range results {
-		fmt.Printf("[main] resultado: trabajo %d -> %d\n", r.ID, r.Procesado)
+		fmt.Printf("[main] resultado recibido: %+v\n", r)
 	}
-
-	wgCollect.Wait()
-	fmt.Println("Pool finalizado.")
 }
